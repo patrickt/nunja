@@ -175,23 +175,26 @@
               ((and (set content-type (request valueForResponseHeader:"Content-Type"))
                     (not (text-html-pattern findInString:content-type)))
                (request respondWithString:BODY))
-              ;; otherwise, return the string wrapped in html tags
+              ;; if so desired, return the string wrapped in html tags
+              (($nunjaDelegate wrapsHTML)
+               (set html "<html>\n<head>\n")
+               (if (response "HEAD")
+                   (then (html appendString:(response "HEAD")))
+                   (else (if HEAD (html appendString:HEAD))))
+               (if (response "TITLE")
+                   (then (html appendString:(+ "\n<title>" (response "TITLE") "</title>")))
+                   (else (if TITLE (html appendString:(+ "\n<title>" TITLE "</title>")))))
+               (set bodyAttributes (response "BODY_ATTRIBUTES"))
+               (html appendString:"</head>\n")
+               (if bodyAttributes
+                   (then (html appendString:"<body #{bodyAttributes}>\n"))
+                   (else (html appendString:"<body>\n")))
+               (html appendString:BODY)
+               (html appendString:"\n</body>\n</html>\n")
+               (request respondWithString:html))
+              ;; otherwise just return the string
               (else
-                   (set html "<html>\n<head>\n")
-                   (if (response "HEAD")
-                       (then (html appendString:(response "HEAD")))
-                       (else (if HEAD (html appendString:HEAD))))
-                   (if (response "TITLE")
-                       (then (html appendString:(+ "\n<title>" (response "TITLE") "</title>")))
-                       (else (if TITLE (html appendString:(+ "\n<title>" TITLE "</title>")))))
-                   (set bodyAttributes (response "BODY_ATTRIBUTES"))
-                   (html appendString:"</head>\n")
-                   (if bodyAttributes
-                       (then (html appendString:"<body #{bodyAttributes}>\n"))
-                       (else (html appendString:"<body>\n")))
-                   (html appendString:BODY)
-                   (html appendString:"\n</body>\n</html>\n")
-                   (request respondWithString:html))))
+                   (request respondWithString:BODY))))
      
      ;; Return a response redirecting the client to a new location.  This method may be called from action handlers.
      (- (id)redirectResponse:(id)request toLocation:(id)location is
@@ -207,13 +210,17 @@
 ;; @class NunjaDelegate
 ;; @discussion The Nunja's delegate. Responsible for handling requests.
 (class NunjaDelegate is NSObject
-     (ivar (id) handlers (id) root)
+     (ivar (id) handlers (id) root (id) wrapsHTML)
      (ivar-accessors)
      
      (- (id) initWithSite:(id) site is
         (self init)
         (set @handlers (array))
-        (set $nunjaDelegate self)
+        ;; I liked using $nunja for the delegate object.
+        (set $nunjaDelegate (set $nunja self))
+        ;; Adding this so that most people's sites go on working swimmingly.
+        ;; I, however, have different needs. I want to use Nom as a templating languages, not ENu.
+        (set @wrapsHTML YES)
         (set @root site)
         (load (+ site "/site.nu"))
         self)
