@@ -49,31 +49,37 @@ static char int_to_char[] = "0123456789ABCDEF";
 
 @implementation NSString(NuHTTP)
 
-- (NSData *)base64
+- (NSData *)base64Data
 {
     return [self base64DataWithNewlines:YES];
 }
 
 - (NSData *) base64DataWithNewlines:(BOOL)encodedWithNewlines
 {
-    // Create a memory buffer containing Base64 encoded string data
-    BIO * mem = BIO_new_mem_buf((void *) [self cStringUsingEncoding:NSUTF8StringEncoding], [self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    const char *cString = [self UTF8String];
+    // Creating the filters
+    BIO *b64 = BIO_new(BIO_f_base64());
+    BIO *inMemory = BIO_new(BIO_s_mem());
+    BIO_flush(b64);
+    if(encodedWithNewlines) BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
     
-    // Push a Base64 filter so that reading from the buffer decodes it
-    BIO * b64 = BIO_new(BIO_f_base64());
-    if (!encodedWithNewlines)
-        BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    mem = BIO_push(b64, mem);
+    // Create a filter chain and write to it
+    b64 = BIO_push(b64, inMemory);
+    BIO_write(b64, cString, strlen(cString));
+    BIO_flush(b64);
     
     // Decode into an NSMutableData
-    NSMutableData * data = [NSMutableData data];
-    char inbuf[512];
-    int inlen;
-    while ((inlen = BIO_read(mem, inbuf, sizeof(inbuf))) > 0)
-        [data appendBytes: inbuf length: inlen];
-    
+    NSMutableData *data = [NSMutableData data];
+    for(;;) {
+        char inbuf[512];
+        int charactersRead = BIO_read(inMemory, inbuf, sizeof(inbuf));
+        [data appendBytes:inbuf length:charactersRead];
+        int remainingCharacters = sizeof(inbuf) - charactersRead;
+        if((sizeof(inbuf) - charactersRead) != 0) break;
+    }
+
     // Clean up and go home
-    BIO_free_all(mem);
+    BIO_free_all(b64);
     return data;
 }
 
