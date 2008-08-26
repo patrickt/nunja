@@ -218,13 +218,20 @@
         (self init)
         (set @handlers (array))
         ;; I liked using $nunja for the delegate object.
-        (set $nunjaDelegate (set $nunja self))
+        (set $nunja self)
+        (set $nunjaDelegate self)
         ;; Adding this so that most people's sites go on working swimmingly.
         ;; I, however, have different needs. I want to use Nom as a templating languages, not ENu.
         (set @wrapsHTML YES)
         (set @root site)
         (load (+ site "/site.nu"))
+        (puts "Site loaded")
         self)
+        
+    (- (id) requireAuthenticationForRequest:(id)request withProcedure:(id)block is
+        (request setValue:"Basic realm=\"Nunja\"" forResponseHeader:"WWW-Authenticate")
+        (puts ((request requestHeaders) description))
+        (request respondWithCode:401 message:"401 Unauthorized" string:"WWW-Authenticate Basic realm=\"Nunja\""))
      
      (- (void) handleRequest:(id) request is
         (set path (request uri))
@@ -281,4 +288,8 @@
 (global root
         (macro _
              ($nunjaDelegate setRoot:(eval (car margs)))))
+
+(global require-administrative-privileges2
+    (macro _
+        ($nunja requireAuthenticationForRequest:REQUEST withProcedure:nil)))
 

@@ -19,6 +19,8 @@ limitations under the License.
 #import "helpers.h"
 #import <arpa/inet.h>
 #import <openssl/md5.h>
+#import <openssl/bio.h>
+#import <openssl/evp.h>
 
 static unichar char_to_int(unichar c)
 {
@@ -46,6 +48,34 @@ static unichar char_to_int(unichar c)
 static char int_to_char[] = "0123456789ABCDEF";
 
 @implementation NSString(NuHTTP)
+
+- (NSData *)base64
+{
+    return [self base64DataWithNewlines:YES];
+}
+
+- (NSData *) base64DataWithNewlines:(BOOL)encodedWithNewlines
+{
+    // Create a memory buffer containing Base64 encoded string data
+    BIO * mem = BIO_new_mem_buf((void *) [self cStringUsingEncoding:NSUTF8StringEncoding], [self lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    
+    // Push a Base64 filter so that reading from the buffer decodes it
+    BIO * b64 = BIO_new(BIO_f_base64());
+    if (!encodedWithNewlines)
+        BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    mem = BIO_push(b64, mem);
+    
+    // Decode into an NSMutableData
+    NSMutableData * data = [NSMutableData data];
+    char inbuf[512];
+    int inlen;
+    while ((inlen = BIO_read(mem, inbuf, sizeof(inbuf))) > 0)
+        [data appendBytes: inbuf length: inlen];
+    
+    // Clean up and go home
+    BIO_free_all(mem);
+    return data;
+}
 
 - (NSString *) urlEncode
 {
@@ -254,7 +284,7 @@ static NSMutableDictionary *parseHeaders(const char *headers)
 + (NSData *) dataWithSize:(int) size
 {
     const char *bytes = (char *) malloc (size * sizeof(char));
-    return [self dataWithBytesNoCopy:bytes length:size freeWhenDone:YES];
+    return (NSData *)[self dataWithBytesNoCopy:bytes length:size freeWhenDone:YES];
 }
 
 static const char *const digits = "0123456789abcdef";

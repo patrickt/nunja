@@ -18,7 +18,10 @@ limitations under the License.
 
 #import <Foundation/Foundation.h>
 
+
 @interface NSString (Nunja)
+- (NSData *)base64;
+- (NSData *)base64DataWithNewlines: (BOOL) encodedWithNewlines;
 /*! URL-encode a string. */
 - (NSString *) urlEncode;
 /*! Decode a url-encoded string. */
