@@ -8,7 +8,8 @@
      
      (- testEncoding is
         (set toEncode "business time")
-        (set encoded (toEncode base64Data))
+        (set encoded (toEncode stringByEncodingWithBase64))
         ;; Obtained from the command line
-        (assert_equal ((NSString alloc) initWithData:encoded encoding:NSUTF8StringEncoding) "YnVzaW5lc3MgdGltZQ==")))
+        (assert_equal encoded "YnVzaW5lc3MgdGltZQ==")
+        (assert_equal (encoded stringByDecodingFromBase64) toEncode)))
 

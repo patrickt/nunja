@@ -203,6 +203,7 @@
         (request respondWithCode:303 message:"redirecting" string:"redirecting")))
 
 (class Nunja
+     
      ;; Return a response redirecting the client to a new location.  This method may be called from action handlers.
      (+ (id)redirectResponse:(id)request toLocation:(id)location is
         (request setValue:location forResponseHeader:"Location")
@@ -227,11 +228,16 @@
         (load (+ site "/site.nu"))
         (puts "Site loaded")
         self)
-        
-    (- (id) requireAuthenticationForRequest:(id)request withProcedure:(id)block is
+     
+     
+     (- (id)decodeCredentials:(id)auth is
+        (set decoded ((/Basic / replaceWithString:"" inString:auth) stringByDecodingFromBase64))
+        ((/:/ splitString:decoded) list))
+     
+     
+     (- (id) requireAuthenticationForRequest:(id)request is
         (request setValue:"Basic realm=\"Nunja\"" forResponseHeader:"WWW-Authenticate")
-        (puts ((request requestHeaders) description))
-        (request respondWithCode:401 message:"401 Unauthorized" string:"WWW-Authenticate Basic realm=\"Nunja\""))
+        (request respondWithCode:401 message:"401 Unauthorized" string:"401 Unauthorized"))
      
      (- (void) handleRequest:(id) request is
         (set path (request uri))
@@ -289,7 +295,10 @@
         (macro _
              ($nunjaDelegate setRoot:(eval (car margs)))))
 
-(global require-administrative-privileges2
-    (macro _
-        ($nunja requireAuthenticationForRequest:REQUEST withProcedure:nil)))
 
+(global require-basic-authentication
+        (macro _
+             (set __confirmationBlock (eval (margs 0)))
+             (set __authorization (REQUEST requestHeader:"Authorization"))
+             (unless (and __authorization (apply __confirmationBlock ($nunjaDelegate decodeCredentials:__authorization)))
+                     (return ($nunjaDelegate requireAuthenticationForRequest:REQUEST)))))

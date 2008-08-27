@@ -41,3 +41,21 @@ limitations under the License.
 /*! Get a dictionary corresponding to a multipart-encoded message body. */
 - (NSDictionary *) multipartDictionaryWithBoundary:(NSString *) boundary;
 @end
+
+@interface NSData (Base64)
+
+- (NSString *) encodeBase64;
+- (NSString *) encodeBase64WithNewlines: (BOOL) encodeWithNewlines;
+
+@end
+
+@interface NSString (Base64)
+
+- (NSString *)stringByEncodingWithBase64;
+- (NSString *)stringByDecodingFromBase64;
+- (NSData *) decodeBase64;
+- (NSData *) decodeBase64WithNewlines: (BOOL) encodedWithNewlines;
+
+@end
+
+

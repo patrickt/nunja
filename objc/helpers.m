@@ -49,39 +49,6 @@ static char int_to_char[] = "0123456789ABCDEF";
 
 @implementation NSString(NuHTTP)
 
-- (NSData *)base64Data
-{
-    return [self base64DataWithNewlines:YES];
-}
-
-- (NSData *) base64DataWithNewlines:(BOOL)encodedWithNewlines
-{
-    const char *cString = [self UTF8String];
-    // Creating the filters
-    BIO *b64 = BIO_new(BIO_f_base64());
-    BIO *inMemory = BIO_new(BIO_s_mem());
-    BIO_flush(b64);
-    if(encodedWithNewlines) BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    
-    // Create a filter chain and write to it
-    b64 = BIO_push(b64, inMemory);
-    BIO_write(b64, cString, strlen(cString));
-    BIO_flush(b64);
-    
-    // Decode into an NSMutableData
-    NSMutableData *data = [NSMutableData data];
-    for(;;) {
-        char inbuf[512];
-        int charactersRead = BIO_read(inMemory, inbuf, sizeof(inbuf));
-        [data appendBytes:inbuf length:charactersRead];
-        int remainingCharacters = sizeof(inbuf) - charactersRead;
-        if((sizeof(inbuf) - charactersRead) != 0) break;
-    }
-
-    // Clean up and go home
-    BIO_free_all(b64);
-    return data;
-}
 
 - (NSString *) urlEncode
 {
@@ -320,6 +287,88 @@ static const char *const digits = "0123456789abcdef";
 {
    unsigned char *digest = MD5([self bytes], [self length], NULL);
    return [NSData dataWithBytes:digest length:16];
+}
+
+@end
+
+// The original code for the libcrypto calls was written by Dave Dribin and released under a FLOSS license.
+// I've added a few methods to ease string-conversion transitions.
+
+@implementation NSData (Base64)
+
+
+- (NSString *) encodeBase64;
+{
+    return [self encodeBase64WithNewlines: NO];
+}
+
+- (NSString *) encodeBase64WithNewlines: (BOOL) encodeWithNewlines;
+{
+    // Create a memory buffer which will contain the Base64 encoded string
+    BIO * mem = BIO_new(BIO_s_mem());
+    
+    // Push on a Base64 filter so that writing to the buffer encodes the data
+    BIO * b64 = BIO_new(BIO_f_base64());
+    if (!encodeWithNewlines)
+        BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    mem = BIO_push(b64, mem);
+    
+    // Encode all the data
+    BIO_write(mem, [self bytes], [self length]);
+    BIO_flush(mem);
+    
+    // Create a new string from the data in the memory buffer
+    char * base64Pointer;
+    long base64Length = BIO_get_mem_data(mem, &base64Pointer);
+    NSString * base64String = [NSString stringWithCString: base64Pointer
+                                                   length: base64Length];
+    
+    // Clean up and go home
+    BIO_free_all(mem);
+    return base64String;
+}
+
+@end
+
+
+@implementation NSString (Base64)
+
+- (NSString *)stringByEncodingWithBase64
+{
+    return [[self dataUsingEncoding:NSUTF8StringEncoding] encodeBase64];
+}
+
+- (NSString *)stringByDecodingFromBase64
+{
+    return [[NSString alloc] initWithData:[self decodeBase64] encoding:NSUTF8StringEncoding];
+}
+
+- (NSData *) decodeBase64;
+{
+    return [self decodeBase64WithNewlines: NO];
+}
+
+- (NSData *) decodeBase64WithNewlines: (BOOL) encodedWithNewlines;
+{
+    // Create a memory buffer containing Base64 encoded string data
+    BIO * mem = BIO_new_mem_buf((void *) [self cString], [self cStringLength]);
+    
+    // Push a Base64 filter so that reading from the buffer decodes it
+    BIO * b64 = BIO_new(BIO_f_base64());
+    if (!encodedWithNewlines)
+        BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    mem = BIO_push(b64, mem);
+    
+    // Decode into an NSMutableData
+    NSMutableData * data = [NSMutableData data];
+    char inbuf[512];
+    int inlen;
+    while ((inlen = BIO_read(mem, inbuf, sizeof(inbuf))) > 0)
+        [data appendBytes: inbuf length: inlen];
+    
+    // Clean up and go home
+    BIO_free_all(mem);
+    return data;
 }
 
 @end

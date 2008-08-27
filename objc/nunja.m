@@ -121,6 +121,11 @@ static NSDictionary *nunja_request_headers_helper(struct evhttp_request *req)
     return nunja_request_headers_helper(req);
 }
 
+- (id)requestHeader:(NSString *)aString
+{
+    return [[self requestHeaders] objectForKey:aString];
+}
+
 static NSDictionary *nunja_response_headers_helper(struct evhttp_request *req)
 {
     NSMutableDictionary *dict = [NSMutableDictionary dictionary];
